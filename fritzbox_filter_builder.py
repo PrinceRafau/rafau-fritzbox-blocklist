@@ -60,13 +60,14 @@ def main():
     for d in exceptions:
         labels=d.split('.')
         parents.update('.'.join(labels[i:]) for i in range(len(labels)-1))
-    seen=set(); outputs={}
+    outputs={}
     for name in ('fakeshops','malware','nsfw','firetv','gambling','social_media','ads_tracking','aggressive'):
-        rules={d for d in groups[name] if d not in parents and not covered(d,exceptions) and not covered(d,seen)}
+        rules={d for d in groups[name] if d not in parents and not covered(d,exceptions)}
         # Keep subdomains: FRITZ!OS matching semantics must be tested separately.
-        seen.update(rules)
-        outputs[name]='\n'.join(sorted(rules))+'\n' if rules else ''
-        print(name,len(rules))
+        if not rules:
+            raise RuntimeError(f'{name}: keine Domains nach Bereinigung; Abbruch')
+        outputs[name]='\n'.join(sorted(rules))+'\n'
+        print(f'{name}: {len(rules):,} Domains, {len(outputs[name].encode("utf-8")):,} Bytes', flush=True)
     for name,data in outputs.items():
         fd,tmp=tempfile.mkstemp(dir=HERE)
         try:
