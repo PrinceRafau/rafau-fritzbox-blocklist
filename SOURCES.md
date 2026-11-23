@@ -1,40 +1,87 @@
 # Quellen und Lizenzen
 
-Dieses Projekt erstellt eine automatisch aktualisierte DNS-Blockliste für FRITZ!Box-Router.
+Dieses Projekt erstellt automatisch aktualisierte, kategorisierte DNS-Filterlisten für FRITZ!Box-Router.
 
-## Verwendete Filterlisten
+## 1. HaGeZi DNS Blocklists
 
-### HaGeZi DNS Blocklists
+- Urheber: HaGeZi
 - Projekt: https://github.com/hagezi/dns-blocklists
-- Lizenz: GPL-3.0
-- Listen: Ultimate, TIF Medium, NSFW
+- Lizenz: GNU General Public License v3.0 (GPL-3.0)
+- Lizenztext: https://github.com/hagezi/dns-blocklists/blob/main/LICENSE
 
-### OISD
-- Projekt: https://oisd.nl/
-- Liste: NSFW
-- Lizenz: GPL-3.0 gemäß den Angaben des Projekts
+### Verwendete Listen
 
-### Perflyst PiHoleBlocklist
+| Originaldatei | Erzeugte Filterdatei |
+|---|---|
+| tif.medium-onlydomains.txt | malware.txt |
+| fake-onlydomains.txt | fakeshops.txt |
+| nsfw-onlydomains.txt | nsfw.txt |
+| gambling.mini-onlydomains.txt | gambling.txt |
+| light-onlydomains.txt | ads_tracking.txt |
+| ultimate-onlydomains.txt | aggressive.txt |
+
+Die Originaldateien werden über das jsDelivr-CDN bezogen.
+
+## 2. Perflyst PiHoleBlocklist
+
+- Urheber: Perflyst und Mitwirkende
 - Projekt: https://github.com/Perflyst/PiHoleBlocklist
-- Liste: AmazonFireTV.txt
 - Lizenz: MIT
+- Originaldatei: AmazonFireTV.txt
+- Quelle: https://perflyst.github.io/PiHoleBlocklist/AmazonFireTV.txt
+- Erzeugte Filterdatei: firetv.txt
 - Lizenztext: [MIT-Perflyst.txt](LICENSES/MIT-Perflyst.txt)
 
-## Verarbeitung
+## 3. Social Media
 
-Die Listen werden automatisch heruntergeladen und zusammengeführt.
+Die Datei social_media.txt basiert auf einer manuell zusammengestellten Auswahl von Tracking-Domains folgender Dienste:
 
-Dabei werden:
-- Doppelte Domains entfernt
-- Ungültige Einträge verworfen
-- Redundante Subdomains entfernt
+- Facebook
+- TikTok
+- X (Twitter)
+- Snapchat
+- Pinterest
+- LinkedIn
 
-Die erzeugte Liste ist eine veränderte Zusammenstellung der genannten Quellen.
+Die Liste dient der Reduzierung von Tracking und soll soziale Netzwerke nicht vollständig sperren.
 
-## Lizenzhinweise
+## 4. Verarbeitung und Änderungen
 
-Die ursprünglichen Urheberrechte bleiben bestehen.
+Die Originalfilterlisten werden durch dieses Projekt verändert und neu zusammengestellt.
 
-Die GPL-3.0-Lizenz ist in [LICENSE](LICENSE) dokumentiert. Der MIT-Lizenztext von Perflyst befindet sich unter [LICENSES/MIT-Perflyst.txt](LICENSES/MIT-Perflyst.txt).
+Die Verarbeitung umfasst:
 
-Die Nutzung und Weiterverbreitung unterliegen den jeweiligen Lizenzbedingungen.
+- Automatisches Herunterladen der Quelldateien
+- Normalisierung der Domainnamen
+- Entfernung ungültiger Einträge
+- Gruppenübergreifende Duplikatbereinigung
+- Berücksichtigung übergeordneter Domains
+- Berücksichtigung individueller Ausnahmen
+- Aufteilung in separate Filtergruppen
+- Regelmäßige automatische Aktualisierung
+
+Der zur Verarbeitung verwendete Python-Quellcode ist öffentlich verfügbar.
+
+## 5. Lizenzinformationen
+
+Die ursprünglichen Urheberrechte und Lizenzbedingungen der verwendeten Quellen bleiben bestehen.
+
+- [GPL-3.0](LICENSE)
+- [MIT-Lizenz von Perflyst](LICENSES/MIT-Perflyst.txt)
+- [Python-Quellcode](fritzbox_filter_builder.py)
+
+Die veröffentlichten Filterdateien sind bearbeitete Zusammenstellungen und keine unveränderten Kopien der Originalfilterlisten.
+
+## 6. Frühere Quellen
+
+In früheren Versionen dieses Projekts wurde zusätzlich OISD NSFW verwendet.
+
+- Projekt: https://oisd.nl/
+
+OISD ist nicht mehr Bestandteil des aktuellen Filtergenerators.
+
+## 7. Haftungsausschluss
+
+Alle Filterlisten werden ohne Gewähr bereitgestellt. Fehlklassifizierungen, unvollständige Sperren und Funktionsbeeinträchtigungen sind möglich.
+
+Dieses Projekt steht in keiner offiziellen Verbindung zu den genannten Quellen oder Unternehmen.
