@@ -1,103 +1,77 @@
 #!/usr/bin/env python3
-"""Erzeugt eine deduplizierte FRITZ!Box-Domainliste. Python 3.9+, keine Pakete nötig.
-Aufruf: python3 fritzbox_filter_builder.py
-Optional: lokale Domains in eigene_blacklist.txt (eine Domain pro Zeile).
-Optional: explizite Ausnahmen in allowlist.txt (eine Domain pro Zeile).
+"""Modified grouped DNS lists. HaGeZi: GPL-3.0; Perflyst: MIT.
+See SOURCES.md and LICENSES for attribution. Python 3.9+.
 """
-import ipaddress
-import os
 import re
-import tempfile
 import urllib.request
 from pathlib import Path
+import os
+import tempfile
 
 HERE = Path(__file__).resolve().parent
-OUT = HERE / 'fritzbox_blocklist.txt'
+BASE = 'https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/wildcard/'
 SOURCES = {
-    'HaGeZi Ultimate': 'https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/wildcard/ultimate-onlydomains.txt',
-    'HaGeZi TIF Medium': 'https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/wildcard/tif.medium-onlydomains.txt',
-    'HaGeZi NSFW': 'https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/wildcard/nsfw-onlydomains.txt',
-    'OISD NSFW': 'https://nsfw.oisd.nl/',
-    'Fire TV': 'https://perflyst.github.io/PiHoleBlocklist/AmazonFireTV.txt',
+    'fakeshops': [BASE+'fake-onlydomains.txt'],
+    'malware': [BASE+'tif.medium-onlydomains.txt'],
+    'nsfw': [BASE+'nsfw-onlydomains.txt'],
+    'firetv': ['https://perflyst.github.io/PiHoleBlocklist/AmazonFireTV.txt'],
+    'gambling': [BASE+'gambling.mini-onlydomains.txt'],
+    'ads_tracking': [BASE+'light-onlydomains.txt'],
+    'aggressive': [BASE+'ultimate-onlydomains.txt'],
 }
-# Facebook-Domains NICHT pauschal freigeben: erst nach konkreten Funktionsproblemen.
-DOMAIN = re.compile(r'(?i)^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?$')
+SOCIAL = {'analytics.facebook.com','pixel.facebook.com','analytics.tiktok.com',
+          'analytics.twitter.com','ads-twitter.com','tr.snapchat.com',
+          'ct.pinterest.com','analytics.pinterest.com','px.ads.linkedin.com'}
+DOMAIN = re.compile(r'(?i)^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$')
+def parse(text):
+    out = set()
+    for line in text.splitlines():
+        line = line.strip().lstrip('\ufeff').split('#',1)[0].strip()
+        if line.startswith('||') and line.endswith('^'): line = line[2:-1]
+        parts = line.split()
+        if len(parts)==2 and parts[0] in ('0.0.0.0','127.0.0.1','::'): line=parts[1]
+        line=line.lower().rstrip('.')
+        if DOMAIN.fullmatch(line) and not line.rsplit('.',1)[-1].isdigit(): out.add(line)
+    return out
 
-def normalize(line):
-    line = line.strip().lstrip('\ufeff')
-    if not line or line.startswith(('#', '!', '[', ';')):
-        return None
-    line = line.split('#', 1)[0].strip()
-    if not line or line.startswith('@@') or '$' in line or '/' in line and not line.startswith('||'):
-        return None
-    if line.startswith('||'):
-        line = line[2:].split('^', 1)[0]
-    elif line.startswith('|') or '*' in line or '^' in line:
-        return None
-    parts = line.split()
-    if len(parts) > 1:
-        try:
-            ipaddress.ip_address(parts[0])
-        except ValueError:
-            return None
-        if len(parts) != 2:
-            return None
-        line = parts[1]
-    line = line.lower().rstrip('.')
-    if line in {'localhost', 'local', 'broadcasthost'} or not DOMAIN.fullmatch(line):
-        return None
-    return line
-
-def load_local(path):
-    if not path.exists():
-        return set()
-    return {d for line in path.read_text(encoding='utf-8').splitlines() if (d := normalize(line))}
-
-def compress(domains):
-    # Entfernt Subdomains NUR, wenn die übergeordnete Domain tatsächlich gesperrt ist.
-    # Funktioniert für DNS-Filter, die auch Subdomains einer gesperrten Domain erfassen.
-    result = set()
-    for domain in sorted(domains, key=lambda d: (d.count('.'), d)):
-        labels = domain.split('.')
-        if not any('.'.join(labels[i:]) in result for i in range(1, len(labels) - 1)):
-            result.add(domain)
-    return result
+def covered(d, rules):
+    labels=d.split('.')
+    return any('.'.join(labels[i:]) in rules for i in range(len(labels)-1))
 
 def main():
-    all_domains = set()
-    for name, url in SOURCES.items():
-        print('Lade', name, flush=True)
-        request = urllib.request.Request(url, headers={'User-Agent': 'FritzboxFilterBuilder/1.0'})
-        with urllib.request.urlopen(request, timeout=90) as response:
-            payload = response.read(100 * 1024 * 1024 + 1)
-        if len(payload) > 100 * 1024 * 1024:
-            raise RuntimeError(f'{name}: Datei zu groß')
-        lines = payload.decode('utf-8-sig').splitlines()
-        parsed = {d for line in lines if (d := normalize(line))}
-        minimum = 5 if name == 'Fire TV' else 50
-        if len(parsed) < minimum:
-            raise RuntimeError(f'{name}: verdächtig wenige Domains ({len(parsed)}), Abbruch')
-        print(f'  {len(parsed):,} gültige Domains')
-        all_domains.update(parsed)
-    all_domains.update(load_local(HERE / 'eigene_blacklist.txt'))
-    allow = load_local(HERE / 'allowlist.txt')
-    # Ausnahmen haben Vorrang; wenn eine übergeordnete Domain geblockt bleibt,
-    # kann eine Ausnahmesubdomain je nach FRITZ!OS trotzdem gesperrt sein.
-    all_domains.difference_update(allow)
-    reduced = compress(all_domains)
-    # Keine unabsichtliche vollständige Liste mit nur wenigen Domains veröffentlichen.
-    if len(reduced) < 1000:
-        raise RuntimeError('Ergebnis ungewöhnlich klein; bestehende Liste bleibt unverändert')
-    data = ('\n'.join(sorted(reduced)) + '\n').encode('utf-8')
-    fd, temp = tempfile.mkstemp(prefix='.fritzbox-', suffix='.tmp', dir=HERE)
-    try:
-        with os.fdopen(fd, 'wb') as f:
-            f.write(data)
-        os.replace(temp, OUT)
-    finally:
-        if os.path.exists(temp):
-            os.unlink(temp)
-    print(f'Fertig: {len(reduced):,} Domains, {len(data):,} Bytes -> {OUT}')
-
-if __name__ == '__main__':
-    main()
+    groups={}
+    for name, urls in SOURCES.items():
+        domains=set()
+        for url in urls:
+            print('Lade',name,url,flush=True)
+            req=urllib.request.Request(url,headers={'User-Agent':'FritzboxFilterBuilder/2.0'})
+            with urllib.request.urlopen(req,timeout=120) as r: data=r.read(100*1024*1024+1)
+            if len(data)>100*1024*1024: raise RuntimeError('Datei zu gross')
+            parsed=parse(data.decode('utf-8-sig'))
+            if len(parsed)<(5 if name=='firetv' else 50): raise RuntimeError(f'{name}: zu wenige Domains')
+            domains.update(parsed)
+        groups[name]=domains
+    groups['social_media']=SOCIAL.copy()
+    local=HERE/'eigene_blacklist.txt'
+    if local.exists(): groups['ads_tracking'].update(parse(local.read_text(encoding='utf-8')))
+    allow=HERE/'allowlist.txt'
+    exceptions=parse(allow.read_text(encoding='utf-8')) if allow.exists() else set()
+    parents=set()
+    for d in exceptions:
+        labels=d.split('.')
+        parents.update('.'.join(labels[i:]) for i in range(len(labels)-1))
+    seen=set(); outputs={}
+    for name in ('fakeshops','malware','nsfw','firetv','gambling','social_media','ads_tracking','aggressive'):
+        rules={d for d in groups[name] if d not in parents and not covered(d,exceptions) and not covered(d,seen)}
+        # Keep subdomains: FRITZ!OS matching semantics must be tested separately.
+        seen.update(rules)
+        outputs[name]='\n'.join(sorted(rules))+'\n' if rules else ''
+        print(name,len(rules))
+    for name,data in outputs.items():
+        fd,tmp=tempfile.mkstemp(dir=HERE)
+        try:
+            with os.fdopen(fd,'w',encoding='utf-8',newline='\n') as f: f.write(data)
+            os.replace(tmp,HERE/(name+'.txt'))
+        finally:
+            if os.path.exists(tmp): os.unlink(tmp)
+if __name__=='__main__': main()
