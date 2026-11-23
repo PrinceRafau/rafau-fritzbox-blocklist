@@ -74,7 +74,8 @@ def main():
             raise RuntimeError(f'{name}: Datei zu groß')
         lines = payload.decode('utf-8-sig').splitlines()
         parsed = {d for line in lines if (d := normalize(line))}
-        if len(parsed) < 50:
+        minimum = 5 if name == 'Fire TV' else 50
+        if len(parsed) < minimum:
             raise RuntimeError(f'{name}: verdächtig wenige Domains ({len(parsed)}), Abbruch')
         print(f'  {len(parsed):,} gültige Domains')
         all_domains.update(parsed)
