@@ -1,0 +1,9 @@
+ads-twitter.com
+analytics.facebook.com
+analytics.pinterest.com
+analytics.tiktok.com
+analytics.twitter.com
+ct.pinterest.com
+pixel.facebook.com
+px.ads.linkedin.com
+tr.snapchat.com
