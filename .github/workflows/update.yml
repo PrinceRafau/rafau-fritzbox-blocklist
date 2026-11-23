@@ -29,7 +29,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add fritzbox_blocklist.txt
+          git add malware.txt fakeshops.txt nsfw.txt firetv.txt gambling.txt social_media.txt ads_tracking.txt aggressive.txt
           if ! git diff --cached --quiet; then
             git commit -m "Automatische Aktualisierung"
             git push
